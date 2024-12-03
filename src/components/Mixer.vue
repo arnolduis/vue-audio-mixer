@@ -1,16 +1,13 @@
 <template>
-
   <div class="vue-audio-mixer" :class="[themeClassSize, themeClassColour, trackClass]" :style="{ width: mixerWidth }">
-
     <p class="vue-audio-mixer-error" v-if="track_load_error">Track {{track_load_error}} failed to load. Check that the track is hosted on the same domain as the mixer, or that CORS is enabled on the track's hosting service.</p>
-
+    
     <Loader v-else-if="loading" :percentLoaded="loadingPercent" />
-
+    
     <div class="vue-audio-mixer-loading-hider" v-show="!loading">
-
       <div class="vue-audio-mixer-channel-strip" ref="channelstrip" >
           <div>
-
+            <!-- Tracks -->
             <MixerChannel 
               v-show="!track.hidden"
               v-for="(track,index) in tracks" 
@@ -32,7 +29,7 @@
               :mixerVars="mixerVars"
             />
 
-            <!-- master channel -->
+            <!-- Master channel -->
             <Channel  
               title="Master" 
               :defaultPan="masterPanValue" 
@@ -70,24 +67,17 @@
             :mixerVars="mixerVars"
             />
           </div>
-
-
       </div>
 
       <div class="text-center">
         <button @click="saveAudioMix" class="vue-audio-mixer-download-mix" :class="{'recording':recording}">Record and download mix</button>
       </div>
-     
-     
-    </div>
-   
-  </div>
 
-    
+    </div>
+  </div>
 </template>
 
 <script>
-
 import MixerChannel from './MixerChannel.vue';
 import Channel from './Channel.vue';
 import TimeDisplay from './TimeDisplay.vue';
@@ -97,8 +87,7 @@ import Loader from './Loader.vue';
 import EventBus from './../event-bus';
 import variables from '../scss/includes/_variables.scss';
 import Recorder from './../recorder';
-
-
+import { config } from 'vue/types/umd';
 
 export default {
   name: 'app',
@@ -130,7 +119,7 @@ export default {
     TransportButtons,
     ProgressBar
   },
-  data : function(){       
+  data : function() {       
       return {
         context                    : false,
         gainNode                   : false,
@@ -159,21 +148,18 @@ export default {
         track_load_error           : false
       };
   },
-  created(){
-
-
+  created() {
     this.currentTime =  Date.now()
     this.startedAt = this.currentTime;
 
     this.checkConfig();
 
-
     var AudioContext = window.AudioContext // Default
-    || window.webkitAudioContext // Safari and old versions of Chrome
-    || false; 
+      || window.webkitAudioContext // Safari and old versions of Chrome
+      || false; 
 
-    this.context            = new AudioContext;
-    this.gainNode           = this.context.createGain();
+    this.context = new AudioContext;
+    this.gainNode = this.context.createGain();
     this.gainNode.connect(this.context.destination);
     this.scriptProcessorNode = this.context.createScriptProcessor(2048, 1, 1);
     this.setupAudioNodes();
@@ -188,61 +174,52 @@ export default {
       if(this.playing)
         this.currentTime =  Date.now()
     }, 1);
-
   },
-
   beforeDestroy() {
     EventBus.$off(this.mixerVars.instance_id+'soloChange',this.detectedSoloChange);
     EventBus.$off(this.mixerVars.instance_id+'track_loaded',this.trackLoaded);
     EventBus.$off(this.mixerVars.instance_id+'stop',this.stopped);
     EventBus.$off(this.mixerVars.instance_id+'play',this.started);
   },
-
   watch: {
-    progressPercent: function(newVal){
+    progressPercent: function(newVal) {
       if(newVal >= 100)
          EventBus.$emit(this.mixerVars.instance_id+'stop');
     },
-
     loading(newVal) {
       EventBus.$emit('loaded',!newVal);
       this.$emit('loaded',!newVal)
     },
-
-    trackSettings(newVal)
-    {
+    trackSettings(newVal) {
       this.$emit('input',newVal)
-    }
-
-    
-  },
-
-  computed: {
-
-    visibleTracks(){
-
-      return this.tracks.filter(t => !t.hidden);
-
     },
+    config(newConfig) {
+      let json = newConfig;
 
-    mixerWidth()
-    {
-
+      if(json) {
+        this.tracks          = json.tracks;
+        this.masterPanValue  = json.master.pan;
+        this.masterGainValue = json.master.gain;
+        this.masterMuted     = json.master.muted;
+      }
+    }
+  },
+  computed: {
+    visibleTracks() {
+      return this.tracks.filter(t => !t.hidden);
+    },
+    mixerWidth() {
       if(this.track_load_error){
         return '500px';
       }
-
 
       let width = 69; // channel width of medium
       if(this.mixerVars.theme_size == 'Small'){
         width = 51; // channel width of small
       }
       return (width*(this.visibleTracks.length+1))+'px';
-
     },
-
-    mixerVars()
-    {
+    mixerVars() {
       return {
         'theme_size'     : this.themeSize,
         'theme_colour'     : this.theme,
@@ -251,38 +228,27 @@ export default {
         'show_total_time': this.showTotalTime
       }
     },
-
-    trackClass()
-    {
-
+    trackClass() {
       return 'vue-audio-mixer-theme-tracks-'+this.tracks.length;
-
     },
-
-    themeClassColour(){
+    themeClassColour() {
       return 'vue-audio-mixer-theme-'+this.theme;
     },
-
     themeClassSize() {
       let className = 'vue-audio-mixer-theme-'+(this.themeSize.toLowerCase());
       let toReturn = {};
       toReturn[className] = true;
       return toReturn;
     },
-
-    themeSize()
-    {
+    themeSize() {
       if(this.size && this.size.toLowerCase() == 'small'){
         return 'Small'
       }
-
       return 'Medium'
     },
 
     // the starter config for the current settings
-    trackSettings()
-    {
-
+    trackSettings() {
       return {
         tracks: this.tracks,
         master:{
@@ -291,38 +257,25 @@ export default {
           "muted":this.masterMuted
         }
       };
-
     },
-
-    progress(){
+    progress() {
       return this.currentTime - this.startedAt;
     },
-
-    progressPercent(){
+    progressPercent() {
       return (100/this.totalDuration)*(this.progress);
     },
-
-    loading(){
+    loading() {
       return this.tracksLoaded == 0 || this.tracksLoaded < this.tracks.length;
     },
-
-    loadingPercent(){
+    loadingPercent() {
       return ((100/this.tracks.length)*this.tracksLoaded).toFixed(2);
     }
-
-  
   },
-
   methods: {
-
-    trackLoadError(track_url)
-    {
-
+    trackLoadError(track_url) {
       this.track_load_error = track_url;
-
     },
-
-    saveAudioMix(){
+    saveAudioMix() {
         this.stop();
         this.recording = true;
         this.recorder = new Recorder(this.pannerNode);
@@ -330,15 +283,12 @@ export default {
         this.recorder.record();
         this.stopMix();
     },
-
     stopMix() {
       setTimeout(() => {
         this.stopRecording();
      }, this.totalDuration)
     },
-
-    stopRecording(){
-
+    stopRecording() {
       if(this.recording){
         this.recording = false;
         this.stop();
@@ -354,9 +304,7 @@ export default {
         });
       }
     },
-
-    detectedSoloChange(track)
-    {
+    detectedSoloChange(track) {
         let index = this.solodTracks.indexOf(track.index);
         if (index > -1) {
           if(!track.solo)
@@ -366,9 +314,7 @@ export default {
             this.solodTracks.push(track.index);
         }
     },
-
-    playFromPercent(percent){
-
+    playFromPercent(percent) {
       if(this.playing){
         this.restart = true;
         EventBus.$emit(this.mixerVars.instance_id+'stop');
@@ -383,10 +329,7 @@ export default {
 
       this.restart = false;
     },
-
-
-    checkConfig(){
-
+    checkConfig() {
       let json = this.config;
 
       if(json){
@@ -395,72 +338,46 @@ export default {
         this.masterGainValue = json.master.gain;
         this.masterMuted     = json.master.muted;
       }
-
-
     },
-
-
-    started(){
+    started() {
       this.overRideProgressBarPosition = false;
       this.playing = true;
     },
-
-    stopped(){
+    stopped() {
       this.playing = false;
     },
-
-    pause()
-    {
-
+    pause() {
       // stop if already playing
       if(this.playing){
         this.stopRecording();
         this.pausedAt = this.progress;
         EventBus.$emit(this.mixerVars.instance_id+'stop');
       }
-
     },
-
-    play()
-    {
+    play() {
       if(this.playing)
         this.pause();
 
       this.doPlay();
-
-      
-      
     },
-    doPlay(){
-
+    doPlay() {
       if(this.progressPercent >= 100){ // it's at the end, so restart
         this.playing = true;
         this.playFromPercent(0);
-      }else{
+      } else {
         this.startedAt = Date.now() - this.progress;
         EventBus.$emit(this.mixerVars.instance_id+'play',this.pausedAt);      
       }
-
     },
-
-
-
-
-
-    togglePlay()
-    {
-
+    togglePlay() {
       if(this.playing){
         this.pause();
       }else {
         this.doPlay();
       }
-      
     },
-
-    stop()
-    {
-      if(!this.playing){
+    stop() {
+      if(!this.playing) {
         this.stopRecording();
       }
 
@@ -470,53 +387,37 @@ export default {
       
       this.pausedAt = 0
 
-      if(!this.playing){
+      if(!this.playing) {
         this.startedAt = this.currentTime;
         EventBus.$emit(this.mixerVars.instance_id+'stop');
       }
     },
-
-    trackLoaded(duration){
-
+    trackLoaded(duration) {
       this.tracksLoaded++;
-
-
-    
-
       duration = duration*1000;
-
       if(duration > this.totalDuration){
         this.totalDuration = duration;
       }
-
     },
-
-
-    changeGain(value){
+    changeGain(value) {
       this.tracks[value.index].gain = parseFloat(value.gain);
     },
-
     changePan(value){
       this.tracks[value.index].pan = parseFloat(value.pan);
     },
-
     changeMute(value){
       this.tracks[value.index].muted = value.muted;
     },
-
     changeSolo(value){
 
     },
-
- 
 
     /************************************************************
     *
     * Master channel controls
     *
     *************************************************************/
-
-    changeMasterMute(value){
+    changeMasterMute(value) {
       if(value){
         this.masterGainValue = this.gainNode.gain.value; // store gain value
         this.gainNode.gain.value = 0; // mute the gain node
@@ -526,20 +427,14 @@ export default {
         this.masterMuted = false;
         this.gainNode.gain.value = this.masterGainValue; // restore previous gain value
       }
-
     },
-
-     // Master Gain
-
-    changeMasterGain(gain)
-    {
+    // Master Gain
+    changeMasterGain(gain) {
       this.masterGainValue = gain;
       if(!this.masterMuted)
         this.gainNode.gain.value = gain;
     },
-
     // Master Pan
-
     changeMasterPan(pan) {
       var xDeg = parseInt(pan);
       var zDeg = xDeg + 90;
@@ -552,12 +447,8 @@ export default {
 
       this.masterPanValue = pan;
     },
-
     // Master Audio Nodes
-
     setupAudioNodes() {
-
-
         // setup a analyzers
         this.leftAnalyser = this.context.createAnalyser();
         this.leftAnalyser.smoothingTimeConstant = 0.3;
@@ -590,12 +481,7 @@ export default {
         this.changeMasterGain(this.masterGainValue);
         this.changeMasterPan(this.masterPanValue);
        // this.changeMasterMute(this.masterMuted);
-
     },
-
-   
-
   }
-
 }
 </script>
